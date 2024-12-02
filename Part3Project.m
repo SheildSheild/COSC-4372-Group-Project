@@ -2,81 +2,114 @@
 % Generate or Load Data
 % -------------------------------
 if exist('phantom_and_projection.mat', 'file')
-    % Load pre-generated data
     load('phantom_and_projection.mat', 'phantom3D', 'projection2D');
+    if ~exist('phantom3D', 'var') || ~exist('projection2D', 'var')
+        error('Required data (phantom3D or projection2D) is missing in phantom_and_projection.mat.');
+    end
     disp('Data loaded successfully from phantom_and_projection.mat');
 else
-    % Generate new data if file doesn't exist
-    disp('Generating new data...');
-
-    % Holly: Generate 3D Leg Phantom
-    dimX = 128; dimY = 128; dimZ = 128;
-    outerRadiusY = 0.7; outerRadiusZ = 0.7;
-    boneRadiusY = 0.3; boneRadiusZ = 0.3;
-    length = 1.0;
-
-    phantom3D = generate3DLegWithLayers(dimX, dimY, dimZ, outerRadiusY, outerRadiusZ, ...
-                                        boneRadiusY, boneRadiusZ, length);
-
-    % Jess: Generate 2D Projection
-    energyLevel = 60; % Energy level in keV
-    I0 = 100; % Initial X-ray intensity
-    muValues = [0.2, 0.15, 0.1, 0.05]; % Default mu values
-    projection2D = generate2DProjectionWithIntensity(phantom3D, muValues, I0);
-
-    % Save generated data for reuse
-    save('phantom_and_projection.mat', 'phantom3D', 'projection2D');
-    disp('Data saved to phantom_and_projection.mat');
+    error('phantom_and_projection.mat file is missing. Run parts 1 and 2 first.');
 end
 
-% Confirm data validity
-if ~exist('phantom3D', 'var') || ~exist('projection2D', 'var')
-    error('Required data (phantom3D or projection2D) is missing.');
-end
+% -------------------------------
+% Simulate Fractures
+% -------------------------------
+disp('Simulating fractures...');
 
-% Display data dimensions
-disp(['phantom3D size: ', mat2str(size(phantom3D))]);
-disp(['projection2D size: ', mat2str(size(projection2D))]);
+% Generate fractured phantoms with adjusted gapSize
+gapSize = 1; % Gap size for horizontal split
+phantom3DOrthogonal = applyFracture(phantom3D, 0, gapSize); % Horizontal split
+phantom3DAngled = applyFracture(phantom3D, 45, gapSize); % Angled split
 
-% Quick visualization
+% Generate 2D projections
+I0 = 1; % Initial X-ray intensity set to 1
+muValues = [0.2, 0.15, 0.1, 0.05]; % Default mu values
+
+projection2DOrthogonal = generate2DProjectionWithIntensity(phantom3DOrthogonal, muValues, I0);
+projection2DAngled = generate2DProjectionWithIntensity(phantom3DAngled, muValues, I0);
+
+% Save fractured data for future use
+save('phantom_and_projection.mat', 'phantom3D', 'projection2D', ...
+    'phantom3DOrthogonal', 'projection2DOrthogonal', ...
+    'phantom3DAngled', 'projection2DAngled', '-append');
+disp('Fractures and projections saved.');
+
+% -------------------------------
+% Visualizations
+% -------------------------------
+disp('Visualizing projections...');
+
+% Orthogonal fracture projection
 figure;
-imagesc(projection2D);
+imagesc(projection2DOrthogonal);
 colormap(gray);
 axis equal tight;
-title('Loaded 2D Projection Data');
+title('Projection with Orthogonal Fracture');
+
+% Angled fracture projection
+figure;
+imagesc(projection2DAngled);
+colormap(gray);
+axis equal tight;
+title('Projection with Angled Fracture');
 
 % -------------------------------
-% Signal Intensity and Contrast Analysis
+% Analyze Signal Intensity and Contrast
 % -------------------------------
-analyze_intensity_and_contrast(projection2D);
+disp('Analyzing intensity and contrast...');
+analyze_intensity_and_contrast(projection2DOrthogonal);
+analyze_intensity_and_contrast(projection2DAngled);
 
 % -------------------------------
-% Image Difference Analysis
+% Analyze Contrast Across Fractures
 % -------------------------------
-difference = analyze_image_difference(phantom3D(:, :, round(size(phantom3D, 3) / 2)), projection2D);
+disp('Analyzing contrast across fractures...');
+
+% Refine split masks based on intensity thresholds
+splitThreshold = 0.5; % Adjusted for values between 0 and 1
+splitMaskOrthogonal = projection2DOrthogonal < splitThreshold;
+splitMaskAngled = projection2DAngled < splitThreshold;
+
+% Analyze contrast
+analyze_split_contrast(projection2DOrthogonal, splitMaskOrthogonal);
+analyze_split_contrast(projection2DAngled, splitMaskAngled);
 
 % -------------------------------
 % Signal Intensity Profiles
 % -------------------------------
-plot_intensity_profile(projection2D, 'row', round(size(projection2D, 1) / 2));
+disp('Plotting signal intensity profiles...');
+
+% Ensure only valid profiles are plotted
+plot_intensity_profile(projection2DOrthogonal, 'column', round(size(projection2DOrthogonal, 1) / 2), 'Orthogonal Fracture');
+plot_intensity_profile(projection2DAngled, 'row', round(size(projection2DAngled, 1) / 2), 'Angled Fracture');
 
 % -------------------------------
 % Function Definitions
 % -------------------------------
 
-% Function to generate a multi-layered 3D phantom
-function phantom3D = generate3DLegWithLayers(dimX, dimY, dimZ, outerRadiusY, outerRadiusZ, ...
-                                             boneRadiusY, boneRadiusZ, length)
-    % Create 3D phantom
-    [x, y, z] = ndgrid(linspace(-1, 1, dimX), linspace(-1, 1, dimY), linspace(-1, 1, dimZ));
+% Apply fracture to a phantom
+function fracturedPhantom = applyFracture(phantom3D, angle, gapSize)
+    [dimX, dimY, dimZ] = size(phantom3D);
 
-    % Layers
-    skin = ((y / outerRadiusY).^2 + (z / outerRadiusZ).^2 <= 1) & (abs(x) <= length / 2);
-    bone = ((y / boneRadiusY).^2 + (z / boneRadiusZ).^2 <= 1) & (abs(x) <= length / 2);
-    phantom3D = skin + 2 * bone; % Multi-layer encoding: 1 for skin, 2 for bone
+    % Create a grid for fracture simulation in the x-y plane
+    [xGrid, yGrid] = ndgrid(1:dimX, 1:dimY);
+    x = xGrid - (dimX + 1) / 2;
+    y = yGrid - (dimY + 1) / 2;
+
+    % Define fracture plane in the x-y plane
+    angle_rad = deg2rad(angle);
+    fracturePlane = abs(x * cos(angle_rad) + y * sin(angle_rad)) <= gapSize / 2;
+
+    % Apply fracture to the phantom across all z slices
+    fracturedPhantom = phantom3D;
+    for z = 1:dimZ
+        slice = fracturedPhantom(:, :, z); % Dimensions: (dimX, dimY)
+        slice(fracturePlane) = 0;
+        fracturedPhantom(:, :, z) = slice;
+    end
 end
 
-% Function to generate 2D projection with intensity control
+% Generate 2D projection with intensity control
 function projection2D = generate2DProjectionWithIntensity(phantom3D, muValues, I0)
     projection2D = zeros(size(phantom3D, 1), size(phantom3D, 2));
     for layer = 1:length(muValues)
@@ -87,66 +120,71 @@ end
 
 % Analyze signal intensity and contrast
 function analyze_intensity_and_contrast(projection2D)
-    % Display intensity range for debugging
     minIntensity = min(projection2D(:));
     maxIntensity = max(projection2D(:));
     disp(['Min projection2D: ', num2str(minIntensity)]);
     disp(['Max projection2D: ', num2str(maxIntensity)]);
 
-    % Dynamically adjust thresholds based on range
+    % Define masks dynamically based on intensity thresholds
     skinMask = (projection2D > minIntensity) & (projection2D <= (minIntensity + 0.3 * (maxIntensity - minIntensity)));
     boneMask = (projection2D > (minIntensity + 0.3 * (maxIntensity - minIntensity)));
 
-    % Extract intensity values
     skin = projection2D(skinMask);
     bone = projection2D(boneMask);
 
-    % Avoid NaN if regions are empty
     if isempty(skin) || isempty(bone)
         warning('Regions for skin or bone are empty. Adjust thresholds.');
         return;
     end
 
-    % Calculate mean signal intensity
     meanSkin = mean(skin(:));
     meanBone = mean(bone(:));
-
-    % Calculate contrast
     contrast = abs(meanSkin - meanBone) / (meanSkin + meanBone);
 
-    % Display results
     fprintf('Mean Signal Intensity - Skin: %.2f\n', meanSkin);
     fprintf('Mean Signal Intensity - Bone: %.2f\n', meanBone);
     fprintf('Contrast (Skin vs Bone): %.2f\n', contrast);
 end
 
+% Analyze contrast across fractures
+function analyze_split_contrast(projection2D, splitMask)
+    splitRegion = projection2D(splitMask);
+    nonSplitRegion = projection2D(~splitMask);
 
+    if isempty(splitRegion) || isempty(nonSplitRegion)
+        warning('No valid regions found for split contrast analysis.');
+        return;
+    end
 
-% Analyze image difference
-function difference = analyze_image_difference(originalPhantom, projection2D)
-    % Resize phantom to match projection dimensions if necessary
-    resizedPhantom = imresize(originalPhantom, size(projection2D));
+    meanSplit = mean(splitRegion(:));
+    meanNonSplit = mean(nonSplitRegion(:));
+    contrast = abs(meanSplit - meanNonSplit) / (meanSplit + meanNonSplit);
 
-    % Calculate absolute difference
-    difference = abs(resizedPhantom - projection2D);
-
-    % Display difference image
-    figure;
-    imagesc(difference);
-    colormap(jet);
-    colorbar;
-    title('Image Difference (Original vs Projection)');
+    fprintf('Contrast across split: %.2f\n', contrast);
 end
 
-% Plot signal intensity profile
-function plot_intensity_profile(projection2D, direction, index)
-    % Extract intensity profile
+function plot_intensity_profile(projection2D, direction, index, projectionType)
+    % Validate input
+    if isempty(projection2D) || all(projection2D(:) == 0)
+        warning('Invalid projection data. Skipping intensity profile plot.');
+        return;
+    end
+
+    % Extract profile
     if strcmp(direction, 'row')
         profile = projection2D(index, :);
+        disp(['Plotting row intensity profile at index: ', num2str(index), ' for ', projectionType]);
     elseif strcmp(direction, 'column')
         profile = projection2D(:, index);
+        disp(['Plotting column intensity profile at index: ', num2str(index), ' for ', projectionType]);
     else
         error('Invalid direction. Use "row" or "column".');
+    end
+
+    % Debug: Check profile data
+    if all(profile == 0)
+        warning(['Profile data is all zeros for ', projectionType, '. Skipping plot.']);
+        return;
     end
 
     % Plot the profile
@@ -154,5 +192,5 @@ function plot_intensity_profile(projection2D, direction, index)
     plot(profile);
     xlabel('Position');
     ylabel('Signal Intensity');
-    title('Signal Intensity Profile', 'Interpreter', 'none');
+    title(['Signal Intensity Profile - ', projectionType], 'Interpreter', 'none');
 end
