@@ -18,6 +18,7 @@ disp('Simulating fractures...');
 
 % Generate fractured phantoms with adjusted gapSize
 gapSize = 1; % Gap size for horizontal split
+phantom3DNormal = applyFracture(phantom3D, 0, 0); % No split
 phantom3DOrthogonal = applyFracture(phantom3D, 0, gapSize); % Horizontal split
 phantom3DAngled = applyFracture(phantom3D, 45, gapSize); % Angled split
 
@@ -25,6 +26,7 @@ phantom3DAngled = applyFracture(phantom3D, 45, gapSize); % Angled split
 I0 = 1; % Initial X-ray intensity set to 1
 muValues = [1, 0.6, 0.05, 0.05]; % Default mu values
 
+projection2DNormal = generate2DProjectionWithIntensity(phantom3DNormal, muValues, I0);
 projection2DOrthogonal = generate2DProjectionWithIntensity(phantom3DOrthogonal, muValues, I0);
 projection2DAngled = generate2DProjectionWithIntensity(phantom3DAngled, muValues, I0);
 
@@ -41,6 +43,13 @@ disp('Fractures and projections saved.');
 % Visualizations
 % -------------------------------
 disp('Visualizing projections...');
+
+% No fracture projection
+figure;
+imagesc(projection2DNormal);
+colormap(gray);
+axis equal tight;
+title('Projection with No Fracture');
 
 % Orthogonal fracture projection
 figure;
@@ -102,6 +111,7 @@ analyze_split_contrast(projection2DAngled, splitMaskAngled);
 disp('Plotting signal intensity profiles...');
 
 % Ensure only valid profiles are plotted
+plot_intensity_profile(projection2DNormal, 'row', round(size(projection2DNormal, 1) / 2), 'No Fracture');
 plot_intensity_profile(projection2DOrthogonal, 'row', round(size(projection2DOrthogonal, 1) / 2), 'Orthogonal Fracture');
 plot_intensity_profile(projection2DAngled, 'row', round(size(projection2DAngled, 1) / 2), 'Angled Fracture');
 
@@ -123,7 +133,7 @@ function fracturedPhantom = applyFracture(phantom3D, angle, gapSize)
     fracturePlane = abs(x * cos(angle_rad) + y * sin(angle_rad)) <= gapSize / 2;
 
     % Apply fracture only to the bone region (assuming bone is layer 2)
-    boneRegion = (phantom3D == 3); % Assuming '2' is the bone label in the phantom
+    boneRegion = (phantom3D == 3);
     fracturedPhantom = phantom3D;
 
     for z = 1:dimZ
