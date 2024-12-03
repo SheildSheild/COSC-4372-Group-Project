@@ -41,9 +41,9 @@ projection2DAngled = generate2DProjectionWithIntensity(phantom3DAngled, muValues
 
 % Apply gamma correction for better visualization
 gamma = 0.01; % Adjust as needed
-projection2DNormal_gamma = projection2DNormal.^gamma;
-projection2DOrthogonal_gamma = projection2DOrthogonal.^gamma;
-projection2DAngled_gamma = projection2DAngled.^gamma;
+projection2DNormal = projection2DNormal.^gamma;
+projection2DOrthogonal = projection2DOrthogonal.^gamma;
+projection2DAngled = projection2DAngled.^gamma;
 
 % Save fractured data for future use
 save('phantom_and_projection.mat', 'phantom3D', 'projection2DNormal', 'projection2DOrthogonal', 'projection2DAngled', '-append');
@@ -56,21 +56,21 @@ disp('Visualizing projections...');
 
 % No fracture projection
 figure;
-imagesc(projection2DNormal_gamma);
+imagesc(projection2DNormal);
 colormap(gray);
 axis equal tight;
 title('Projection with No Fracture');
 
 % Orthogonal fracture projection
 figure;
-imagesc(projection2DOrthogonal_gamma);
+imagesc(projection2DOrthogonal);
 colormap(gray);
 axis equal tight;
 title('Projection with Orthogonal Fracture');
 
 % Angled fracture projection
 figure;
-imagesc(projection2DAngled_gamma);
+imagesc(projection2DAngled);
 colormap(gray);
 axis equal tight;
 title('Projection with Angled Fracture');
@@ -80,7 +80,7 @@ title('Projection with Angled Fracture');
 % -------------------------------
 disp('Analyzing intensity and contrast...');
 
-% Analyze using the function (adjusted for new layers)
+% Analyze using the function
 analyze_intensity_and_contrast(projection2DNormal, 'No Fracture');
 analyze_intensity_and_contrast(projection2DOrthogonal, 'Orthogonal Fracture');
 analyze_intensity_and_contrast(projection2DAngled, 'Angled Fracture');
