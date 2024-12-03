@@ -1,5 +1,4 @@
 % Clearing workspace and close figures to avoid overloading session
-clear all;
 close all;
 clc;
 
@@ -41,7 +40,7 @@ projection2DOrthogonal = generate2DProjectionWithIntensity(phantom3DOrthogonal, 
 projection2DAngled = generate2DProjectionWithIntensity(phantom3DAngled, muValues, I0);
 
 % Apply gamma correction for better visualization
-gamma = 0.5; % Adjust as needed
+gamma = 0.01; % Adjust as needed
 projection2DNormal_gamma = projection2DNormal.^gamma;
 projection2DOrthogonal_gamma = projection2DOrthogonal.^gamma;
 projection2DAngled_gamma = projection2DAngled.^gamma;
