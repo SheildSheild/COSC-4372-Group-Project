@@ -32,6 +32,10 @@ phantom3DNormal = phantom3D; % No fracture
 phantom3DOrthogonal = applyFracture(phantom3D, 0, gapSize); % Orthogonal fracture
 phantom3DAngled = applyFracture(phantom3D, fractureAngle, gapSize); % Angled fracture
 
+skin_mu = 0.01;
+fat_mu = 0.015;
+muscle_mu = 0.02;
+bone_mu = 0.04;
 % Generate 2D projections
 I0 = 1; % Initial X-ray intensity
 muValues = [0.01, 0.015, 0.02, 0.04]; % [Skin, Fat, Muscle, Bone]
