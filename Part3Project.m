@@ -23,11 +23,14 @@ phantom3DAngled = applyFracture(phantom3D, 45, gapSize); % Angled split
 
 % Generate 2D projections
 I0 = 1; % Initial X-ray intensity set to 1
-muValues = [0.2, 0.15, 0.1, 0.05]; % Default mu values
+muValues = [1, 0.6, 0.05, 0.05]; % Default mu values
 
 projection2DOrthogonal = generate2DProjectionWithIntensity(phantom3DOrthogonal, muValues, I0);
 projection2DAngled = generate2DProjectionWithIntensity(phantom3DAngled, muValues, I0);
 
+gamma = 0.5; % Adjust this value for better brightness
+projection2DOrthogonal = projection2DOrthogonal.^gamma;
+projection2DAngled = projection2DAngled.^gamma;
 % Save fractured data for future use
 save('phantom_and_projection.mat', 'phantom3D', 'projection2D', ...
     'phantom3DOrthogonal', 'projection2DOrthogonal', ...
@@ -65,14 +68,33 @@ analyze_intensity_and_contrast(projection2DAngled);
 % -------------------------------
 disp('Analyzing contrast across fractures...');
 
-% Refine split masks based on intensity thresholds
-splitThreshold = 0.5; % Adjusted for values between 0 and 1
-splitMaskOrthogonal = projection2DOrthogonal < splitThreshold;
-splitMaskAngled = projection2DAngled < splitThreshold;
+% After gamma correction, check intensity range
+minIntensityOrthogonal = min(projection2DOrthogonal(:));
+maxIntensityOrthogonal = max(projection2DOrthogonal(:));
+disp(['Orthogonal Projection - Min Intensity: ', num2str(minIntensityOrthogonal)]);
+disp(['Orthogonal Projection - Max Intensity: ', num2str(maxIntensityOrthogonal)]);
+
+minIntensityAngled = min(projection2DAngled(:));
+maxIntensityAngled = max(projection2DAngled(:));
+disp(['Angled Projection - Min Intensity: ', num2str(minIntensityAngled)]);
+disp(['Angled Projection - Max Intensity: ', num2str(maxIntensityAngled)]);
+
+% Calculate splitThreshold dynamically for each projection
+splitThresholdOrthogonal = minIntensityOrthogonal + 0.5 * (maxIntensityOrthogonal - minIntensityOrthogonal);
+splitThresholdAngled = minIntensityAngled + 0.5 * (maxIntensityAngled - minIntensityAngled);
+
+% Display the calculated thresholds
+disp(['Calculated splitThresholdOrthogonal: ', num2str(splitThresholdOrthogonal)]);
+disp(['Calculated splitThresholdAngled: ', num2str(splitThresholdAngled)]);
+
+% Create split masks based on the calculated thresholds
+splitMaskOrthogonal = projection2DOrthogonal < splitThresholdOrthogonal;
+splitMaskAngled = projection2DAngled < splitThresholdAngled;
 
 % Analyze contrast
 analyze_split_contrast(projection2DOrthogonal, splitMaskOrthogonal);
 analyze_split_contrast(projection2DAngled, splitMaskAngled);
+
 
 % -------------------------------
 % Signal Intensity Profiles
@@ -80,7 +102,7 @@ analyze_split_contrast(projection2DAngled, splitMaskAngled);
 disp('Plotting signal intensity profiles...');
 
 % Ensure only valid profiles are plotted
-plot_intensity_profile(projection2DOrthogonal, 'column', round(size(projection2DOrthogonal, 1) / 2), 'Orthogonal Fracture');
+plot_intensity_profile(projection2DOrthogonal, 'row', round(size(projection2DOrthogonal, 1) / 2), 'Orthogonal Fracture');
 plot_intensity_profile(projection2DAngled, 'row', round(size(projection2DAngled, 1) / 2), 'Angled Fracture');
 
 % -------------------------------
@@ -100,14 +122,19 @@ function fracturedPhantom = applyFracture(phantom3D, angle, gapSize)
     angle_rad = deg2rad(angle);
     fracturePlane = abs(x * cos(angle_rad) + y * sin(angle_rad)) <= gapSize / 2;
 
-    % Apply fracture to the phantom across all z slices
+    % Apply fracture only to the bone region (assuming bone is layer 2)
+    boneRegion = (phantom3D == 3); % Assuming '2' is the bone label in the phantom
     fracturedPhantom = phantom3D;
+
     for z = 1:dimZ
-        slice = fracturedPhantom(:, :, z); % Dimensions: (dimX, dimY)
-        slice(fracturePlane) = 0;
-        fracturedPhantom(:, :, z) = slice;
+        slice = phantom3D(:, :, z); % Get the z-th slice
+        boneSlice = boneRegion(:, :, z); % Identify bone in the slice
+        fractureMask = fracturePlane & boneSlice; % Apply fracture only to bone
+        slice(fractureMask) = 0; % Remove the fractured region
+        fracturedPhantom(:, :, z) = slice; % Update the fractured phantom
     end
 end
+
 
 % Generate 2D projection with intensity control
 function projection2D = generate2DProjectionWithIntensity(phantom3D, muValues, I0)
