@@ -27,20 +27,25 @@ disp('Simulating fractures...');
 
 % Generate fractured phantoms with adjusted gapSize
 gapSize = 1; % Gap size for fractures
+fractureAngle = 45;
 phantom3DNormal = phantom3D; % No fracture
 phantom3DOrthogonal = applyFracture(phantom3D, 0, gapSize); % Orthogonal fracture
-phantom3DAngled = applyFracture(phantom3D, 45, gapSize); % Angled fracture
+phantom3DAngled = applyFracture(phantom3D, fractureAngle, gapSize); % Angled fracture
 
 % Generate 2D projections
 I0 = 1; % Initial X-ray intensity
-muValues = [0.04, 0.03, 0.015, 0.005]; % [Skin, Fat, Muscle, Bone]
+muValues = [0.01, 0.015, 0.02, 0.04]; % [Skin, Fat, Muscle, Bone]
 
 projection2DNormal = generate2DProjectionWithIntensity(phantom3DNormal, muValues, I0);
 projection2DOrthogonal = generate2DProjectionWithIntensity(phantom3DOrthogonal, muValues, I0);
 projection2DAngled = generate2DProjectionWithIntensity(phantom3DAngled, muValues, I0);
 
+projection2DNormal = 1 - projection2DNormal;
+projection2DOrthogonal = 1 - projection2DOrthogonal;
+projection2DAngled = 1 - projection2DAngled;
+
 % Apply gamma correction for better visualization
-gamma = 0.01; % Adjust as needed
+gamma = 2.5; % Adjust as needed
 projection2DNormal = projection2DNormal.^gamma;
 projection2DOrthogonal = projection2DOrthogonal.^gamma;
 projection2DAngled = projection2DAngled.^gamma;
